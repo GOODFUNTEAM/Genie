@@ -3,26 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>即時心願牆 - 直式籤紙版</title>
+    <title>即時心願牆</title>
     <style>
-        /* 1. 載入自訂字體 (金萱 Medium) */
+        /* 載入金萱 Medium 字體 */
         @font-face {
-            font-family: 'JinXuanMedium';
+            font-family: 'JinXuan';
             src: url('jf-jinxuan-3.1-medium.otf') format('opentype');
-            font-weight: normal;
-            font-style: normal;
-            font-display: swap; 
         }
 
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            /* 使用更柔和的背景，突顯籤紙 */
-            background: radial-gradient(circle at center, #2c3e50 0%, #1a252f 100%);
-            color: #333; /* 籤紙上的文字顏色 */
-            /* 2. 套用自訂字體 */
-            font-family: 'JinXuanMedium', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+            background: radial-gradient(circle at center, #1b2735 0%, #090a0f 100%);
+            color: #2c1a1a; 
+            font-family: 'JinXuan', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
             height: 100vh;
         }
 
@@ -32,140 +27,103 @@
             height: 100%;
         }
 
-        .title {
-            position: absolute;
-            top: 30px;
-            width: 100%;
-            text-align: center;
-            font-size: 20px;
-            letter-spacing: 10px;
-            color: rgba(255, 255, 255, 0.3);
-            font-weight: 300;
-            z-index: 10;
-        }
-
         .wish {
             position: absolute;
-            /* 3. 【核心修改】設定為直式書寫 */
-            writing-mode: vertical-rl;
-            text-orientation: upright; /* 確保直書時文字方向正確 */
-            
-            /* 4. 設定背景圖片屬性 */
-            background-size: 100% 100%; /* 確保圖片完全覆蓋氣泡 */
+            writing-mode: vertical-rl; /* 直式書寫 */
+            text-orientation: upright;
+            background-size: 100% 100%;
             background-repeat: no-repeat;
             background-position: center;
             
-            /* 5. 調整 Padding，讓文字落在籤紙的正確位置 */
-            /* 因為是直式，這裡的 padding 是 (上下, 左右) */
-            padding: 50px 25px; /* 根據圖片形狀調大上下邊距 */
-            
-            /* 設定籤紙的寬高，避免文字過長撐破 */
-            width: 60px; /* 根據圖片比例設定 */
-            height: auto; /* 高度隨文字長度自動調整，但有最大值 */
-            max-height: 400px; /* 限制最大高度 */
+            /* 籤紙文字位置微調 */
+            padding: 65px 15px; 
+            width: 50px; 
+            min-height: 180px;
+            max-height: 380px;
 
-            /* 移除原本的樣式 */
-            background-color: transparent;
-            border-radius: 0;
-            backdrop-filter: none;
-            -webkit-backdrop-filter: none;
-            border: none;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); /* 保留陰影 */
-            
-            /* 字體與動畫設定 */
             font-size: var(--size);
-            font-weight: 500; /* 加粗一點點 */
             animation: floatUp var(--duration) ease-in-out infinite;
             opacity: 0;
             pointer-events: none;
-            /* 調整文字陰影 */
-            text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.8);
+            filter: drop-shadow(0 5px 12px rgba(0,0,0,0.6));
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        /* 6. 定義三種顏色的 CSS Class */
+        /* 隨機籤紙顏色 */
         .ticket-red { background-image: url('07-RED.png'); }
         .ticket-yel { background-image: url('07-YEL.png'); }
         .ticket-whi { background-image: url('07-WHI.png'); }
 
         @keyframes floatUp {
-            0% { transform: translateY(110vh) translateX(0) scale(0.9); opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { transform: translateY(-30vh) translateX(var(--drift)) scale(1.02); opacity: 0; }
+            0% { transform: translateY(110vh) translateX(0) rotate(1deg); opacity: 0; }
+            15% { opacity: 1; }
+            85% { opacity: 1; }
+            100% { transform: translateY(-40vh) translateX(var(--drift)) rotate(-1deg); opacity: 0; }
         }
     </style>
 </head>
 <body>
 
-    <div class="title">REAL-TIME WISHES</div>
     <div id="wish-container"></div>
 
     <script>
-        // 你的 Google 試算表 ID
-        const SPREADSHEET_ID = '1vTOMwOceLB5s4quJ-GFyPpFgBmU7HvmbtPuiJVA2XRDgkRrWjhb9b4pfurlhA0dTMqOYNO6ZpoZGp3C';
+        // 你的最新試算表 ID
+        const SPREADSHEET_ID = '1H-IhwTpeNzHZbdaXvh-MrIN60JLgtVHwF0XzkkCRe2k';
         const SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
 
         let knownWishes = new Set();
-        // 籤紙顏色 Class 陣列
         const ticketClasses = ['ticket-red', 'ticket-yel', 'ticket-whi'];
 
         async function fetchWishes() {
             try {
-                const response = await fetch(`${SHEET_CSV_URL}&nocache=${new Date().getTime()}`);
+                const response = await fetch(`${SHEET_CSV_URL}&t=${new Date().getTime()}`);
+                if (!response.ok) return;
+                
                 const csvData = await response.text();
+                // 解析 CSV 資料
+                const rows = csvData.split('\n').map(row => 
+                    row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => cell.replace(/^"(.*)"$/, '$1').trim())
+                );
                 
-                const rows = csvData.split('\n').map(row => {
-                    return row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => cell.replace(/^"(.*)"$/, '$1').trim());
-                });
-                
+                // 從第 2 列開始讀取 (i=1)
                 for (let i = 1; i < rows.length; i++) {
-                    let wishText = rows[i][1]; // B 欄：願望內容
-                    const status = rows[i][2]; // C 欄：狀態碼 (1)
+                    const wishText = rows[i][1]; // 只看 B 欄願望內容
                     
-                    // 只要狀態是 1，就處理顯示
-                    if (status === "1") {
-                        // 如果 B 欄是空的，給一個預設文字
-                        if (!wishText || wishText.trim() === "") {
-                            wishText = "悄悄許下了願望";
-                        }
-
-                        // 【核心修改】：如果表單自動產生的字眼是「未填寫願望」，就跳過不處理
-                        if (wishText === "未填寫願望") {
-                            continue; 
-                        }
-
-                        const wishId = wishText + i;
-
-                        if (!knownWishes.has(wishId)) {
-                            createWish(wishText);
-                            knownWishes.add(wishId);
+                    // 只要內容不是空的，且不是 "未填寫願望"，就全部顯示
+                    if (wishText) {
+                        const trimmedText = wishText.trim();
+                        
+                        if (trimmedText !== "" && trimmedText !== "未填寫願望") {
+                            // 使用內容 + 索引作為唯一標記，避免重複產生
+                            const wishId = trimmedText + i;
+                            if (!knownWishes.has(wishId)) {
+                                createWish(trimmedText);
+                                knownWishes.add(wishId);
+                            }
                         }
                     }
                 }
-            } catch (e) {
-                console.error("同步失敗:", e);
-            }
+            } catch (e) { console.error("同步出錯:", e); }
         }
 
         function createWish(text) {
             const container = document.getElementById('wish-container');
             const el = document.createElement('div');
-            el.className = 'wish';
+            
+            // 隨機選一個顏色 Class
+            const randomColor = ticketClasses[Math.floor(Math.random() * 3)];
+            el.className = `wish ${randomColor}`;
             el.innerText = text;
 
-            // 隨機樣式參數
-            const left = Math.random() * 85 + 5; // 調整範圍，避免籤紙貼邊
-            const duration = Math.random() * 15 + 25; // 25~40 秒慢慢飄
-            const size = Math.random() * 4 + 18;      // 字體大小隨機 18~22px
-            const drift = (Math.random() - 0.5) * 150; // 左右搖擺幅度
-
-            // 初始載入時隨機分布在畫面上，之後新產生的從底部出現
+            const left = Math.random() * 85 + 5;
+            const duration = Math.random() * 10 + 25; 
+            const size = Math.random() * 4 + 19;      
+            const drift = (Math.random() - 0.5) * 180; 
+            
             const isInitial = knownWishes.size === 0;
             const delay = isInitial ? Math.random() * duration : 0;
-
-            // 【核心修改】：隨機賦予一個顏色 Class
-            const randomColorClass = ticketClasses[Math.floor(Math.random() * ticketClasses.length)];
-            el.classList.add(randomColorClass);
 
             el.style.setProperty('--duration', `${duration}s`);
             el.style.setProperty('--size', `${size}px`);
@@ -176,7 +134,6 @@
             container.appendChild(el);
         }
 
-        // 啟動程式
         fetchWishes();
         setInterval(fetchWishes, 5000); 
     </script>
