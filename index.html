@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>即時心願牆</title>
     <style>
-        /* 載入金萱 Medium 字體 */
         @font-face {
             font-family: 'JinXuan';
             src: url('jf-jinxuan-3.1-medium.otf') format('opentype');
@@ -15,7 +14,13 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background: radial-gradient(circle at center, #1b2735 0%, #090a0f 100%);
+            /* --- 換上你的自訂背景 my_bg.png --- */
+            background-image: url('my_bg.png');
+            background-size: cover;       /* 自動縮放填滿螢幕，不留白 */
+            background-position: center;  /* 圖片對齊中心 */
+            background-repeat: no-repeat;
+            background-attachment: fixed; /* 背景固定，讓籤紙飄過 */
+            /* ------------------------------ */
             color: #2c1a1a; 
             font-family: 'JinXuan', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
             height: 100vh;
@@ -29,47 +34,55 @@
 
         .wish {
             position: absolute;
-            writing-mode: vertical-rl; /* 直式書寫 */
+            writing-mode: vertical-rl;
             text-orientation: upright;
-            background-size: 100% 100%;
             background-repeat: no-repeat;
-            background-position: center;
+            background-position: center top;
+            background-size: 100% 100%;
             
-            /* 籤紙文字位置微調 */
+            /* 維持 12 字不換行的比例 */
+            width: auto;
+            min-width: 80px; 
+            max-width: 160px;
+            min-height: 480px; 
+            
             padding: 65px 15px; 
-            width: 50px; 
-            min-height: 180px;
-            max-height: 380px;
-
+            box-sizing: border-box;
+            
+            display: flex;
+            align-items: center; 
+            justify-content: flex-start;
+            
             font-size: var(--size);
+            line-height: 1.4;
+            letter-spacing: 2px;
+            
             animation: floatUp var(--duration) ease-in-out infinite;
             opacity: 0;
-            pointer-events: none;
-            filter: drop-shadow(0 5px 12px rgba(0,0,0,0.6));
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            /* 在自訂背景上增加陰影，讓籤紙更顯眼 */
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.4));
+            text-align: center;
+            word-break: break-all;
+            /* 輕微文字陰影增加易讀性 */
+            text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.5);
         }
 
-        /* 隨機籤紙顏色 */
         .ticket-red { background-image: url('07-RED.png'); }
         .ticket-yel { background-image: url('07-YEL.png'); }
         .ticket-whi { background-image: url('07-WHI.png'); }
 
         @keyframes floatUp {
-            0% { transform: translateY(110vh) translateX(0) rotate(1deg); opacity: 0; }
-            15% { opacity: 1; }
-            85% { opacity: 1; }
-            100% { transform: translateY(-40vh) translateX(var(--drift)) rotate(-1deg); opacity: 0; }
+            0% { transform: translateY(110vh) translateX(0) rotate(1.5deg); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-70vh) translateX(var(--drift)) rotate(-1.5deg); opacity: 0; }
         }
     </style>
 </head>
 <body>
-
     <div id="wish-container"></div>
-
     <script>
-        // 你的最新試算表 ID
+        // 確保 ID 正確
         const SPREADSHEET_ID = '1H-IhwTpeNzHZbdaXvh-MrIN60JLgtVHwF0XzkkCRe2k';
         const SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
 
@@ -80,53 +93,40 @@
             try {
                 const response = await fetch(`${SHEET_CSV_URL}&t=${new Date().getTime()}`);
                 if (!response.ok) return;
-                
                 const csvData = await response.text();
-                // 解析 CSV 資料
                 const rows = csvData.split('\n').map(row => 
                     row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => cell.replace(/^"(.*)"$/, '$1').trim())
                 );
                 
-                // 從第 2 列開始讀取 (i=1)
                 for (let i = 1; i < rows.length; i++) {
-                    const wishText = rows[i][1]; // 只看 B 欄願望內容
-                    
-                    // 只要內容不是空的，且不是 "未填寫願望"，就全部顯示
-                    if (wishText) {
-                        const trimmedText = wishText.trim();
-                        
-                        if (trimmedText !== "" && trimmedText !== "未填寫願望") {
-                            // 使用內容 + 索引作為唯一標記，避免重複產生
-                            const wishId = trimmedText + i;
-                            if (!knownWishes.has(wishId)) {
-                                createWish(trimmedText);
-                                knownWishes.add(wishId);
-                            }
+                    const wishText = rows[i][1]; 
+                    if (wishText && wishText !== "未填寫願望" && wishText.trim() !== "") {
+                        const wishId = wishText + i;
+                        if (!knownWishes.has(wishId)) {
+                            createWish(wishText);
+                            knownWishes.add(wishId);
                         }
                     }
                 }
-            } catch (e) { console.error("同步出錯:", e); }
+            } catch (e) { console.error("資料讀取失敗:", e); }
         }
 
         function createWish(text) {
             const container = document.getElementById('wish-container');
             const el = document.createElement('div');
-            
-            // 隨機選一個顏色 Class
-            const randomColor = ticketClasses[Math.floor(Math.random() * 3)];
-            el.className = `wish ${randomColor}`;
+            el.className = `wish ${ticketClasses[Math.floor(Math.random() * 3)]}`;
             el.innerText = text;
 
-            const left = Math.random() * 85 + 5;
-            const duration = Math.random() * 10 + 25; 
-            const size = Math.random() * 4 + 19;      
-            const drift = (Math.random() - 0.5) * 180; 
+            const left = Math.random() * 80 + 10;
+            const duration = Math.random() * 12 + 25; 
+            const drift = (Math.random() - 0.5) * 220;
+            const fontSize = 22; 
             
             const isInitial = knownWishes.size === 0;
             const delay = isInitial ? Math.random() * duration : 0;
 
             el.style.setProperty('--duration', `${duration}s`);
-            el.style.setProperty('--size', `${size}px`);
+            el.style.setProperty('--size', `${fontSize}px`);
             el.style.setProperty('--drift', `${drift}px`);
             el.style.left = `${left}%`;
             el.style.animationDelay = `-${delay}s`;
