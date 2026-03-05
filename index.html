@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>即時心願牆</title>
+    <title>即時心願牆 - 互動版</title>
     <style>
         @font-face {
             font-family: 'JinXuan';
@@ -14,16 +14,15 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            /* --- 換上你的自訂背景 my_bg.png --- */
             background-image: url('my_bg.png');
-            background-size: cover;       /* 自動縮放填滿螢幕，不留白 */
-            background-position: center;  /* 圖片對齊中心 */
+            background-size: cover;
+            background-position: center;
             background-repeat: no-repeat;
-            background-attachment: fixed; /* 背景固定，讓籤紙飄過 */
-            /* ------------------------------ */
+            background-attachment: fixed;
             color: #2c1a1a; 
             font-family: 'JinXuan', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
             height: 100vh;
+            touch-action: none; /* 防止手機拖動時網頁跟著動 */
         }
 
         #wish-container {
@@ -36,35 +35,46 @@
             position: absolute;
             writing-mode: vertical-rl;
             text-orientation: upright;
+            background-size: contain;
             background-repeat: no-repeat;
             background-position: center top;
-            background-size: 100% 100%;
             
-            /* 維持 12 字不換行的比例 */
-            width: auto;
-            min-width: 80px; 
-            max-width: 160px;
-            min-height: 480px; 
-            
-            padding: 65px 15px; 
+            /* 基礎尺寸由 JS 根據 600x900 比例動態設定 */
+            padding: 25px 15px; 
             box-sizing: border-box;
             
             display: flex;
             align-items: center; 
-            justify-content: flex-start;
+            justify-content: center;
             
             font-size: var(--size);
-            line-height: 1.4;
-            letter-spacing: 2px;
+            line-height: 1.2;
+            letter-spacing: 1px;
             
+            /* 動畫設定：當不是拖拉狀態時，執行飄浮動畫 */
             animation: floatUp var(--duration) ease-in-out infinite;
             opacity: 0;
-            /* 在自訂背景上增加陰影，讓籤紙更顯眼 */
-            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.4));
+            filter: drop-shadow(0 5px 10px rgba(0,0,0,0.3));
             text-align: center;
             word-break: break-all;
-            /* 輕微文字陰影增加易讀性 */
-            text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.5);
+            
+            cursor: grab; /* 讓鼠標變成抓取手勢 */
+            user-select: none;
+            transition: transform 0.1s ease-out; /* 輕微移動平滑感 */
+        }
+
+        /* 抓取中的狀態 */
+        .wish.dragging {
+            animation-play-state: paused; /* 拖拉時暫停向上飄 */
+            cursor: grabbing;
+            transition: none; /* 拖拉時需要即時反應 */
+            z-index: 1000;
+        }
+
+        /* 回彈動畫 */
+        .wish.returning {
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform: translate(0, 0) !important;
         }
 
         .ticket-red { background-image: url('07-RED.png'); }
@@ -72,17 +82,17 @@
         .ticket-whi { background-image: url('07-WHI.png'); }
 
         @keyframes floatUp {
-            0% { transform: translateY(110vh) translateX(0) rotate(1.5deg); opacity: 0; }
+            0% { transform: translateY(110vh) translateX(0) rotate(1deg); opacity: 0; }
             10% { opacity: 1; }
             90% { opacity: 1; }
-            100% { transform: translateY(-70vh) translateX(var(--drift)) rotate(-1.5deg); opacity: 0; }
+            100% { transform: translateY(-70vh) translateX(var(--drift)) rotate(-1deg); opacity: 0; }
         }
     </style>
 </head>
 <body>
     <div id="wish-container"></div>
+
     <script>
-        // 確保 ID 正確
         const SPREADSHEET_ID = '1H-IhwTpeNzHZbdaXvh-MrIN60JLgtVHwF0XzkkCRe2k';
         const SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
 
@@ -108,7 +118,7 @@
                         }
                     }
                 }
-            } catch (e) { console.error("資料讀取失敗:", e); }
+            } catch (e) { console.error(e); }
         }
 
         function createWish(text) {
@@ -118,18 +128,74 @@
             el.innerText = text;
 
             const left = Math.random() * 80 + 10;
-            const duration = Math.random() * 12 + 25; 
-            const drift = (Math.random() - 0.5) * 220;
-            const fontSize = 22; 
+            const duration = Math.random() * 10 + 25; 
+            const drift = (Math.random() - 0.5) * 200;
             
-            const isInitial = knownWishes.size === 0;
-            const delay = isInitial ? Math.random() * duration : 0;
+            let baseWidth = 120;
+            let fontSize = 20;
+            if (text.length > 8) {
+                baseWidth = 160; 
+                fontSize = 18;
+            }
+            const baseHeight = baseWidth * (900 / 600);
 
+            el.style.width = `${baseWidth}px`;
+            el.style.height = `${baseHeight}px`;
             el.style.setProperty('--duration', `${duration}s`);
             el.style.setProperty('--size', `${fontSize}px`);
             el.style.setProperty('--drift', `${drift}px`);
             el.style.left = `${left}%`;
-            el.style.animationDelay = `-${delay}s`;
+            
+            const isInitial = knownWishes.size === 0;
+            el.style.animationDelay = isInitial ? `-${Math.random() * duration}s` : '0s';
+
+            // --- 拖拉互動邏輯 ---
+            let startX, startY, currentX = 0, currentY = 0;
+
+            const startDrag = (e) => {
+                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+                startX = clientX - currentX;
+                startY = clientY - currentY;
+                el.classList.add('dragging');
+                el.classList.remove('returning');
+                
+                document.addEventListener('mousemove', drag);
+                document.addEventListener('touchmove', drag, { passive: false });
+                document.addEventListener('mouseup', stopDrag);
+                document.addEventListener('touchend', stopDrag);
+            };
+
+            const drag = (e) => {
+                if (!el.classList.contains('dragging')) return;
+                e.preventDefault();
+                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+                currentX = clientX - startX;
+                currentY = clientY - startY;
+                el.style.transform = `translate(${currentX}px, ${currentY}px)`;
+            };
+
+            const stopDrag = () => {
+                el.classList.remove('dragging');
+                el.classList.add('returning'); // 觸發回彈 CSS
+                
+                // 回彈後重置數值
+                setTimeout(() => {
+                    currentX = 0;
+                    currentY = 0;
+                    el.classList.remove('returning');
+                    el.style.transform = ''; // 清除 transform 讓 animation 重新接管
+                }, 600);
+
+                document.removeEventListener('mousemove', drag);
+                document.removeEventListener('touchmove', drag);
+                document.removeEventListener('mouseup', stopDrag);
+                document.removeEventListener('touchend', stopDrag);
+            };
+
+            el.addEventListener('mousedown', startDrag);
+            el.addEventListener('touchstart', startDrag, { passive: false });
 
             container.appendChild(el);
         }
