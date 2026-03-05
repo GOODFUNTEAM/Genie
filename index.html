@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>許願牆</title>
+    <title> 精靈的肚子</title>
     <style>
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+            background: radial-gradient(circle at center, #1b2735 0%, #090a0f 100%);
             color: white;
-            font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
             height: 100vh;
         }
 
@@ -21,76 +21,78 @@
             height: 100%;
         }
 
+        .title {
+            position: absolute;
+            top: 30px;
+            width: 100%;
+            text-align: center;
+            font-size: 22px;
+            letter-spacing: 8px;
+            color: rgba(255, 255, 255, 0.3);
+            font-weight: 300;
+            z-index: 10;
+        }
+
         .wish {
             position: absolute;
             white-space: nowrap;
-            padding: 12px 24px;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 30px;
+            padding: 12px 25px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50px;
             backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-            animation: floatUp var(--duration) linear infinite;
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
             font-size: var(--size);
+            animation: floatUp var(--duration) ease-in-out infinite;
             opacity: 0;
-            transition: transform 0.3s ease;
+            pointer-events: none;
         }
 
         @keyframes floatUp {
-            0% {
-                transform: translateY(110vh) translateX(0);
-                opacity: 0;
-            }
-            15% { opacity: 1; }
-            85% { opacity: 1; }
-            100% {
-                transform: translateY(-20vh) translateX(var(--drift));
-                opacity: 0;
-            }
-        }
-
-        .title {
-            position: absolute;
-            top: 20px;
-            width: 100%;
-            text-align: center;
-            font-size: 24px;
-            letter-spacing: 5px;
-            color: rgba(255, 255, 255, 0.5);
-            z-index: 10;
+            0% { transform: translateY(110vh) translateX(0) scale(0.9); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-20vh) translateX(var(--drift)) scale(1); opacity: 0; }
         }
     </style>
 </head>
 <body>
 
-    <div class="title">大家的願望</div>
+    <div class="title">REAL-TIME WISH WALL</div>
     <div id="wish-container"></div>
 
     <script>
-        // 這是你提供的連結（已轉換為 CSV 格式）
-        const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTOMwOceLB5s4quJ-GFyPpFgBmU7HvmbtPuiJVA2XRDgkRrWjhb9b4pfurlhA0dTMqOYNO6ZpoZGp3C/pub?output=csv';
+        // 核心設定：使用直連 ID 與 5 秒快速輪詢
+        const SPREADSHEET_ID = '1vTOMwOceLB5s4quJ-GFyPpFgBmU7HvmbtPuiJVA2XRDgkRrWjhb9b4pfurlhA0dTMqOYNO6ZpoZGp3C';
+        const SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
 
         let knownWishes = new Set();
 
         async function fetchWishes() {
             try {
-                const response = await fetch(SHEET_CSV_URL);
+                // 加入隨機參數 nocache 強迫 Google 給出最新資料
+                const response = await fetch(`${SHEET_CSV_URL}&nocache=${new Date().getTime()}`);
                 const csvData = await response.text();
                 
-                // 解析 CSV 並取得 B 欄 (願望內容)
-                const rows = csvData.split('\n').map(row => row.split(','));
+                // 解析 CSV 並取得 B 欄
+                const rows = csvData.split('\n').map(row => row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/));
                 
-                // 從第二列開始遍歷 (index 1)，因為第一列是標題
                 for (let i = 1; i < rows.length; i++) {
-                    const wishText = rows[i][1]; // 這裡對應 B 欄：願望內容
-                    
-                    if (wishText && wishText.trim() !== "" && !knownWishes.has(wishText + i)) {
-                        createWish(wishText.trim());
-                        knownWishes.add(wishText + i);
+                    let wishText = rows[i][1]; 
+                    if (wishText) {
+                        wishText = wishText.replace(/"/g, "").trim(); 
+                        const wishId = wishText + i;
+                        
+                        // 如果是新願望，立刻加入畫面
+                        if (wishText !== "" && !knownWishes.has(wishId)) {
+                            createWish(wishText);
+                            knownWishes.add(wishId);
+                        }
                     }
                 }
             } catch (e) {
-                console.error("資料讀取失敗:", e);
+                console.error("同步失敗:", e);
             }
         }
 
@@ -100,26 +102,27 @@
             el.className = 'wish';
             el.innerText = text;
 
-            // 隨機化效果
-            const left = Math.random() * 80 + 5; 
-            const duration = Math.random() * 10 + 20; // 慢速飄動 20-30 秒
-            const size = Math.random() * 8 + 18; // 字體 18-26px
-            const drift = (Math.random() - 0.5) * 150; 
-            const delay = Math.random() * 20;
+            const left = Math.random() * 80 + 10;
+            const duration = Math.random() * 10 + 20; 
+            const size = Math.random() * 6 + 18;
+            const drift = (Math.random() - 0.5) * 200;
+            
+            // 如果是初始載入，隨機分配位置；如果是新加入的，從底部開始
+            const isInitial = knownWishes.size === 0;
+            const delay = isInitial ? Math.random() * duration : 0;
 
             el.style.setProperty('--duration', `${duration}s`);
             el.style.setProperty('--size', `${size}px`);
             el.style.setProperty('--drift', `${drift}px`);
             el.style.left = `${left}%`;
-            // 負的 delay 讓初始進入網頁時願望就錯落在畫面各處
             el.style.animationDelay = `-${delay}s`;
 
             container.appendChild(el);
         }
 
-        // 每 20 秒檢查一次 Google 試算表有無新資料
+        // 啟動：每 5 秒檢查一次
         fetchWishes();
-        setInterval(fetchWishes, 20000);
+        setInterval(fetchWishes, 5000); 
     </script>
 </body>
 </html>
