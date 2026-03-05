@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>即時心願牆 - 互動版</title>
+    <title>即時心願牆 - 互動強化版</title>
     <style>
         @font-face {
             font-family: 'JinXuan';
@@ -22,7 +22,7 @@
             color: #2c1a1a; 
             font-family: 'JinXuan', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
             height: 100vh;
-            touch-action: none; /* 防止手機拖動時網頁跟著動 */
+            touch-action: none;
         }
 
         #wish-container {
@@ -38,43 +38,40 @@
             background-size: contain;
             background-repeat: no-repeat;
             background-position: center top;
-            
-            /* 基礎尺寸由 JS 根據 600x900 比例動態設定 */
             padding: 25px 15px; 
             box-sizing: border-box;
-            
             display: flex;
             align-items: center; 
             justify-content: center;
-            
             font-size: var(--size);
             line-height: 1.2;
             letter-spacing: 1px;
             
-            /* 動畫設定：當不是拖拉狀態時，執行飄浮動畫 */
-            animation: floatUp var(--duration) ease-in-out infinite;
+            /* 動畫：速度已加快 */
+            animation: floatUp var(--duration) linear infinite; 
             opacity: 0;
             filter: drop-shadow(0 5px 10px rgba(0,0,0,0.3));
             text-align: center;
             word-break: break-all;
-            
-            cursor: grab; /* 讓鼠標變成抓取手勢 */
+            cursor: grab;
             user-select: none;
-            transition: transform 0.1s ease-out; /* 輕微移動平滑感 */
+            /* 增加 transform 的過渡效果，讓放大縮小時更順滑 */
+            transition: transform 0.2s ease-out, opacity 0.3s; 
         }
 
-        /* 抓取中的狀態 */
+        /* --- 核心修改：抓取時自動放大 --- */
         .wish.dragging {
-            animation-play-state: paused; /* 拖拉時暫停向上飄 */
+            animation-play-state: paused; 
             cursor: grabbing;
-            transition: none; /* 拖拉時需要即時反應 */
+            /* 抓起時放大 1.2 倍，並維持原本拖拽的 translate 座標 */
+            transform: translate(var(--tx), var(--ty)) scale(1.2) !important;
             z-index: 1000;
+            filter: drop-shadow(0 15px 30px rgba(0,0,0,0.5)); /* 放大時陰影加深 */
         }
 
-        /* 回彈動畫 */
         .wish.returning {
-            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            transform: translate(0, 0) !important;
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform: translate(0, 0) scale(1) !important;
         }
 
         .ticket-red { background-image: url('07-RED.png'); }
@@ -83,9 +80,9 @@
 
         @keyframes floatUp {
             0% { transform: translateY(110vh) translateX(0) rotate(1deg); opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { transform: translateY(-70vh) translateX(var(--drift)) rotate(-1deg); opacity: 0; }
+            5% { opacity: 1; }
+            95% { opacity: 1; }
+            100% { transform: translateY(-80vh) translateX(var(--drift)) rotate(-1deg); opacity: 0; }
         }
     </style>
 </head>
@@ -128,7 +125,9 @@
             el.innerText = text;
 
             const left = Math.random() * 80 + 10;
-            const duration = Math.random() * 10 + 25; 
+            
+            // --- 核心修改：大幅提升速度 (原本 25~35s -> 現在 12~18s) ---
+            const duration = Math.random() * 6 + 12; 
             const drift = (Math.random() - 0.5) * 200;
             
             let baseWidth = 120;
@@ -149,7 +148,6 @@
             const isInitial = knownWishes.size === 0;
             el.style.animationDelay = isInitial ? `-${Math.random() * duration}s` : '0s';
 
-            // --- 拖拉互動邏輯 ---
             let startX, startY, currentX = 0, currentY = 0;
 
             const startDrag = (e) => {
@@ -157,6 +155,7 @@
                 const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
                 startX = clientX - currentX;
                 startY = clientY - currentY;
+                
                 el.classList.add('dragging');
                 el.classList.remove('returning');
                 
@@ -173,20 +172,25 @@
                 const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
                 currentX = clientX - startX;
                 currentY = clientY - startY;
-                el.style.transform = `translate(${currentX}px, ${currentY}px)`;
+                
+                // 將座標存入 CSS 變數，供 scale(1.2) 使用而不重疊
+                el.style.setProperty('--tx', `${currentX}px`);
+                el.style.setProperty('--ty', `${currentY}px`);
+                el.style.transform = `translate(${currentX}px, ${currentY}px) scale(1.2)`;
             };
 
             const stopDrag = () => {
                 el.classList.remove('dragging');
-                el.classList.add('returning'); // 觸發回彈 CSS
+                el.classList.add('returning'); 
                 
-                // 回彈後重置數值
                 setTimeout(() => {
                     currentX = 0;
                     currentY = 0;
                     el.classList.remove('returning');
-                    el.style.transform = ''; // 清除 transform 讓 animation 重新接管
-                }, 600);
+                    el.style.transform = ''; 
+                    el.style.removeProperty('--tx');
+                    el.style.removeProperty('--ty');
+                }, 500);
 
                 document.removeEventListener('mousemove', drag);
                 document.removeEventListener('touchmove', drag);
