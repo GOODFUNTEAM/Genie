@@ -23,6 +23,9 @@
             font-family: 'JinXuan', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
             height: 100vh;
             touch-action: none;
+            /* 防止整個網頁被選取 */
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         #wish-container {
@@ -38,35 +41,39 @@
             background-size: contain;
             background-repeat: no-repeat;
             background-position: center top;
-            padding: 25px 15px; 
+            padding: 30px 15px; /* 稍微增加上下 Padding */
             box-sizing: border-box;
             display: flex;
             align-items: center; 
             justify-content: center;
+            
+            /* --- 文字大小優化 --- */
             font-size: var(--size);
-            line-height: 1.2;
+            line-height: 1.3;
             letter-spacing: 1px;
             
-            /* 動畫：速度已加快 */
             animation: floatUp var(--duration) linear infinite; 
             opacity: 0;
             filter: drop-shadow(0 5px 10px rgba(0,0,0,0.3));
             text-align: center;
             word-break: break-all;
+            
             cursor: grab;
+            
+            /* --- 核心修改：禁止文字選取 --- */
             user-select: none;
-            /* 增加 transform 的過渡效果，讓放大縮小時更順滑 */
+            -webkit-user-select: none;
+            -ms-user-select: none;
+            
             transition: transform 0.2s ease-out, opacity 0.3s; 
         }
 
-        /* --- 核心修改：抓取時自動放大 --- */
         .wish.dragging {
             animation-play-state: paused; 
             cursor: grabbing;
-            /* 抓起時放大 1.2 倍，並維持原本拖拽的 translate 座標 */
             transform: translate(var(--tx), var(--ty)) scale(1.2) !important;
             z-index: 1000;
-            filter: drop-shadow(0 15px 30px rgba(0,0,0,0.5)); /* 放大時陰影加深 */
+            filter: drop-shadow(0 15px 30px rgba(0,0,0,0.5));
         }
 
         .wish.returning {
@@ -82,7 +89,7 @@
             0% { transform: translateY(110vh) translateX(0) rotate(1deg); opacity: 0; }
             5% { opacity: 1; }
             95% { opacity: 1; }
-            100% { transform: translateY(-80vh) translateX(var(--drift)) rotate(-1deg); opacity: 0; }
+            100% { transform: translateY(-85vh) translateX(var(--drift)) rotate(-1deg); opacity: 0; }
         }
     </style>
 </head>
@@ -125,17 +132,21 @@
             el.innerText = text;
 
             const left = Math.random() * 80 + 10;
+            const duration = Math.random() * 5 + 10; // 再次微調，讓速度感更強 (10~15秒)
+            const drift = (Math.random() - 0.5) * 220;
             
-            // --- 核心修改：大幅提升速度 (原本 25~35s -> 現在 12~18s) ---
-            const duration = Math.random() * 6 + 12; 
-            const drift = (Math.random() - 0.5) * 200;
+            /* --- 修改：縮小字體級距 --- */
+            let baseWidth = 110;  // 稍微縮小基礎寬度
+            let fontSize = 17;    // 基礎小字 (原本 20)
             
-            let baseWidth = 120;
-            let fontSize = 20;
             if (text.length > 8) {
-                baseWidth = 160; 
-                fontSize = 18;
+                baseWidth = 140; 
+                fontSize = 15;    // 長難句更小 (原本 18)
             }
+            if (text.length > 15) {
+                fontSize = 13;    // 極長句縮到 13px
+            }
+            
             const baseHeight = baseWidth * (900 / 600);
 
             el.style.width = `${baseWidth}px`;
@@ -173,7 +184,6 @@
                 currentX = clientX - startX;
                 currentY = clientY - startY;
                 
-                // 將座標存入 CSS 變數，供 scale(1.2) 使用而不重疊
                 el.style.setProperty('--tx', `${currentX}px`);
                 el.style.setProperty('--ty', `${currentY}px`);
                 el.style.transform = `translate(${currentX}px, ${currentY}px) scale(1.2)`;
