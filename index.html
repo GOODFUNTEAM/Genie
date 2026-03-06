@@ -2,36 +2,53 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>即時心願牆 - 互動強化版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>即時心願牆 - 質感進階版</title>
     <style>
         @font-face {
             font-family: 'JinXuan';
             src: url('jf-jinxuan-3.1-medium.otf') format('opentype');
         }
 
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
+        #bg-fixed {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             background-image: url('my_bg.png');
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
-            background-attachment: fixed;
+            z-index: -1;
+            transform: translateZ(0);
+            /* 讓背景模糊的變化更順滑 */
+            transition: filter 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* --- 效果 3：抓取時背景變暗、模糊 --- */
+        body.is-dragging #bg-fixed {
+            filter: blur(8px) brightness(0.6);
+        }
+        
+        /* 抓取時讓其他沒被選中的籤紙也變淡變模糊 */
+        body.is-dragging .wish:not(.dragging) {
+            opacity: 0.2 !important;
+            filter: blur(4px);
+            transition: all 0.5s;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
             color: #2c1a1a; 
             font-family: 'JinXuan', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
             height: 100vh;
             touch-action: none;
-            /* 防止整個網頁被選取 */
             user-select: none;
             -webkit-user-select: none;
-        }
-
-        #wish-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
         }
 
         .wish {
@@ -41,43 +58,35 @@
             background-size: contain;
             background-repeat: no-repeat;
             background-position: center top;
-            padding: 30px 15px; /* 稍微增加上下 Padding */
+            padding: 30px 15px;
             box-sizing: border-box;
             display: flex;
             align-items: center; 
             justify-content: center;
-            
-            /* --- 文字大小優化 --- */
             font-size: var(--size);
             line-height: 1.3;
             letter-spacing: 1px;
             
-            animation: floatUp var(--duration) linear infinite; 
+            /* --- 效果 2：使用更豐富的曲線讓上升帶有搖擺感 --- */
+            animation: floatUp var(--duration) ease-in-out infinite; 
             opacity: 0;
-            filter: drop-shadow(0 5px 10px rgba(0,0,0,0.3));
             text-align: center;
             word-break: break-all;
-            
             cursor: grab;
-            
-            /* --- 核心修改：禁止文字選取 --- */
-            user-select: none;
-            -webkit-user-select: none;
-            -ms-user-select: none;
-            
-            transition: transform 0.2s ease-out, opacity 0.3s; 
+            transition: transform 0.2s ease-out, opacity 0.3s, filter 0.3s;
         }
 
         .wish.dragging {
             animation-play-state: paused; 
             cursor: grabbing;
-            transform: translate(var(--tx), var(--ty)) scale(1.2) !important;
+            /* 抓起時稍微發光並放大 */
+            transform: translate(var(--tx), var(--ty)) scale(1.25) !important;
             z-index: 1000;
-            filter: drop-shadow(0 15px 30px rgba(0,0,0,0.5));
+            filter: drop-shadow(0 20px 40px rgba(0,0,0,0.6)) brightness(1.1);
         }
 
         .wish.returning {
-            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             transform: translate(0, 0) scale(1) !important;
         }
 
@@ -85,15 +94,29 @@
         .ticket-yel { background-image: url('07-YEL.png'); }
         .ticket-whi { background-image: url('07-WHI.png'); }
 
+        /* --- 效果 2：優化後的搖擺動畫 --- */
         @keyframes floatUp {
-            0% { transform: translateY(110vh) translateX(0) rotate(1deg); opacity: 0; }
-            5% { opacity: 1; }
-            95% { opacity: 1; }
-            100% { transform: translateY(-85vh) translateX(var(--drift)) rotate(-1deg); opacity: 0; }
+            0% { 
+                transform: translateY(110vh) translateX(0) rotate(2deg); 
+                opacity: 0;
+                filter: drop-shadow(0 5px 5px rgba(0,0,0,0.3));
+            }
+            15% { opacity: 1; }
+            /* 漂浮過程中的隨機晃動 */
+            30% { transform: translateY(70vh) translateX(20px) rotate(-1deg); }
+            60% { transform: translateY(35vh) translateX(-20px) rotate(1deg); }
+            85% { opacity: 1; }
+            100% { 
+                transform: translateY(-95vh) translateX(var(--drift)) rotate(-2deg); 
+                opacity: 0;
+                /* 飛高後影子拉長變淡 */
+                filter: drop-shadow(0 30px 20px rgba(0,0,0,0.1));
+            }
         }
     </style>
 </head>
 <body>
+    <div id="bg-fixed"></div>
     <div id="wish-container"></div>
 
     <script>
@@ -132,20 +155,13 @@
             el.innerText = text;
 
             const left = Math.random() * 80 + 10;
-            const duration = Math.random() * 5 + 10; // 再次微調，讓速度感更強 (10~15秒)
-            const drift = (Math.random() - 0.5) * 220;
+            const duration = Math.random() * 5 + 12; 
+            const drift = (Math.random() - 0.5) * 250;
             
-            /* --- 修改：縮小字體級距 --- */
-            let baseWidth = 110;  // 稍微縮小基礎寬度
-            let fontSize = 17;    // 基礎小字 (原本 20)
-            
-            if (text.length > 8) {
-                baseWidth = 140; 
-                fontSize = 15;    // 長難句更小 (原本 18)
-            }
-            if (text.length > 15) {
-                fontSize = 13;    // 極長句縮到 13px
-            }
+            let baseWidth = 110;
+            let fontSize = 16; 
+            if (text.length > 8) { baseWidth = 140; fontSize = 14; }
+            if (text.length > 15) { fontSize = 12; }
             
             const baseHeight = baseWidth * (900 / 600);
 
@@ -168,6 +184,7 @@
                 startY = clientY - currentY;
                 
                 el.classList.add('dragging');
+                document.body.classList.add('is-dragging'); // 觸發背景模糊
                 el.classList.remove('returning');
                 
                 document.addEventListener('mousemove', drag);
@@ -186,11 +203,12 @@
                 
                 el.style.setProperty('--tx', `${currentX}px`);
                 el.style.setProperty('--ty', `${currentY}px`);
-                el.style.transform = `translate(${currentX}px, ${currentY}px) scale(1.2)`;
+                el.style.transform = `translate(${currentX}px, ${currentY}px) scale(1.25)`;
             };
 
             const stopDrag = () => {
                 el.classList.remove('dragging');
+                document.body.classList.remove('is-dragging'); // 恢復背景
                 el.classList.add('returning'); 
                 
                 setTimeout(() => {
@@ -198,9 +216,7 @@
                     currentY = 0;
                     el.classList.remove('returning');
                     el.style.transform = ''; 
-                    el.style.removeProperty('--tx');
-                    el.style.removeProperty('--ty');
-                }, 500);
+                }, 600);
 
                 document.removeEventListener('mousemove', drag);
                 document.removeEventListener('touchmove', drag);
