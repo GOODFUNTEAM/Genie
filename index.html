@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>即時心願牆 - 質感進階版</title>
+    <title>即時心願牆 - 沉浸體驗版</title>
     <style>
         @font-face {
             font-family: 'JinXuan';
@@ -20,22 +20,38 @@
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
-            z-index: -1;
+            z-index: -2;
             transform: translateZ(0);
-            /* 讓背景模糊的變化更順滑 */
-            transition: filter 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: filter 0.6s ease;
         }
 
-        /* --- 效果 3：抓取時背景變暗、模糊 --- */
+        /* --- 螢火蟲粒子樣式 --- */
+        .firefly {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(255, 230, 150, 0.6);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: -1;
+            filter: blur(1px);
+            box-shadow: 0 0 10px rgba(255, 200, 50, 0.8);
+            animation: fireflyMove var(--d) ease-in-out infinite;
+        }
+
+        @keyframes fireflyMove {
+            0% { transform: translateY(110vh) translateX(0); opacity: 0; }
+            50% { opacity: 1; transform: translateY(50vh) translateX(30px); }
+            100% { transform: translateY(-10vh) translateX(-30px); opacity: 0; }
+        }
+
         body.is-dragging #bg-fixed {
             filter: blur(8px) brightness(0.6);
         }
         
-        /* 抓取時讓其他沒被選中的籤紙也變淡變模糊 */
         body.is-dragging .wish:not(.dragging) {
             opacity: 0.2 !important;
             filter: blur(4px);
-            transition: all 0.5s;
         }
 
         body {
@@ -48,7 +64,6 @@
             height: 100vh;
             touch-action: none;
             user-select: none;
-            -webkit-user-select: none;
         }
 
         .wish {
@@ -66,8 +81,6 @@
             font-size: var(--size);
             line-height: 1.3;
             letter-spacing: 1px;
-            
-            /* --- 效果 2：使用更豐富的曲線讓上升帶有搖擺感 --- */
             animation: floatUp var(--duration) ease-in-out infinite; 
             opacity: 0;
             text-align: center;
@@ -79,7 +92,6 @@
         .wish.dragging {
             animation-play-state: paused; 
             cursor: grabbing;
-            /* 抓起時稍微發光並放大 */
             transform: translate(var(--tx), var(--ty)) scale(1.25) !important;
             z-index: 1000;
             filter: drop-shadow(0 20px 40px rgba(0,0,0,0.6)) brightness(1.1);
@@ -94,24 +106,13 @@
         .ticket-yel { background-image: url('07-YEL.png'); }
         .ticket-whi { background-image: url('07-WHI.png'); }
 
-        /* --- 效果 2：優化後的搖擺動畫 --- */
         @keyframes floatUp {
-            0% { 
-                transform: translateY(110vh) translateX(0) rotate(2deg); 
-                opacity: 0;
-                filter: drop-shadow(0 5px 5px rgba(0,0,0,0.3));
-            }
+            0% { transform: translateY(110vh) translateX(0) rotate(2deg); opacity: 0; }
             15% { opacity: 1; }
-            /* 漂浮過程中的隨機晃動 */
             30% { transform: translateY(70vh) translateX(20px) rotate(-1deg); }
             60% { transform: translateY(35vh) translateX(-20px) rotate(1deg); }
             85% { opacity: 1; }
-            100% { 
-                transform: translateY(-95vh) translateX(var(--drift)) rotate(-2deg); 
-                opacity: 0;
-                /* 飛高後影子拉長變淡 */
-                filter: drop-shadow(0 30px 20px rgba(0,0,0,0.1));
-            }
+            100% { transform: translateY(-95vh) translateX(var(--drift)) rotate(-2deg); opacity: 0; }
         }
     </style>
 </head>
@@ -120,9 +121,47 @@
     <div id="wish-container"></div>
 
     <script>
+        // --- 初始化音效 (使用 Web Audio 合成一個簡單的摩擦聲，不需額外檔案) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playGrabSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const bufferSize = audioCtx.sampleRate * 0.1;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 800;
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            noise.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            noise.start();
+        }
+
+        // --- 建立螢火蟲粒子 ---
+        function createFireflies() {
+            const container = document.body;
+            for(let i=0; i<20; i++) {
+                const f = document.createElement('div');
+                f.className = 'firefly';
+                f.style.left = Math.random() * 100 + 'vw';
+                f.style.setProperty('--d', (Math.random() * 10 + 10) + 's');
+                f.style.setProperty('--x', (Math.random() * 100 - 50) + 'px');
+                f.style.animationDelay = Math.random() * 10 + 's';
+                container.appendChild(f);
+            }
+        }
+        createFireflies();
+
         const SPREADSHEET_ID = '1H-IhwTpeNzHZbdaXvh-MrIN60JLgtVHwF0XzkkCRe2k';
         const SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
-
         let knownWishes = new Set();
         const ticketClasses = ['ticket-red', 'ticket-yel', 'ticket-whi'];
 
@@ -134,7 +173,6 @@
                 const rows = csvData.split('\n').map(row => 
                     row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => cell.replace(/^"(.*)"$/, '$1').trim())
                 );
-                
                 for (let i = 1; i < rows.length; i++) {
                     const wishText = rows[i][1]; 
                     if (wishText && wishText !== "未填寫願望" && wishText.trim() !== "") {
@@ -162,7 +200,6 @@
             let fontSize = 16; 
             if (text.length > 8) { baseWidth = 140; fontSize = 14; }
             if (text.length > 15) { fontSize = 12; }
-            
             const baseHeight = baseWidth * (900 / 600);
 
             el.style.width = `${baseWidth}px`;
@@ -171,22 +208,19 @@
             el.style.setProperty('--size', `${fontSize}px`);
             el.style.setProperty('--drift', `${drift}px`);
             el.style.left = `${left}%`;
-            
-            const isInitial = knownWishes.size === 0;
-            el.style.animationDelay = isInitial ? `-${Math.random() * duration}s` : '0s';
+            el.style.animationDelay = `-${Math.random() * duration}s`;
 
             let startX, startY, currentX = 0, currentY = 0;
 
             const startDrag = (e) => {
+                playGrabSound(); // 播放抓取聲
                 const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
                 const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
                 startX = clientX - currentX;
                 startY = clientY - currentY;
-                
                 el.classList.add('dragging');
-                document.body.classList.add('is-dragging'); // 觸發背景模糊
+                document.body.classList.add('is-dragging');
                 el.classList.remove('returning');
-                
                 document.addEventListener('mousemove', drag);
                 document.addEventListener('touchmove', drag, { passive: false });
                 document.addEventListener('mouseup', stopDrag);
@@ -200,7 +234,6 @@
                 const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
                 currentX = clientX - startX;
                 currentY = clientY - startY;
-                
                 el.style.setProperty('--tx', `${currentX}px`);
                 el.style.setProperty('--ty', `${currentY}px`);
                 el.style.transform = `translate(${currentX}px, ${currentY}px) scale(1.25)`;
@@ -208,16 +241,13 @@
 
             const stopDrag = () => {
                 el.classList.remove('dragging');
-                document.body.classList.remove('is-dragging'); // 恢復背景
+                document.body.classList.remove('is-dragging');
                 el.classList.add('returning'); 
-                
                 setTimeout(() => {
-                    currentX = 0;
-                    currentY = 0;
+                    currentX = 0; currentY = 0;
                     el.classList.remove('returning');
                     el.style.transform = ''; 
                 }, 600);
-
                 document.removeEventListener('mousemove', drag);
                 document.removeEventListener('touchmove', drag);
                 document.removeEventListener('mouseup', stopDrag);
@@ -226,7 +256,6 @@
 
             el.addEventListener('mousedown', startDrag);
             el.addEventListener('touchstart', startDrag, { passive: false });
-
             container.appendChild(el);
         }
 
