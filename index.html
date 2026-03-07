@@ -3,38 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>即時心願牆 - 沉浸體驗版</title>
+    <title>即時心願牆 - 沉浸互動版</title>
     <style>
         @font-face {
             font-family: 'JinXuan';
             src: url('jf-jinxuan-3.1-medium.otf') format('opentype');
         }
 
+        /* 穩定背景層 */
         #bg-fixed {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0; width: 100%; height: 100%;
             background-image: url('my_bg.png');
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            z-index: -2;
-            transform: translateZ(0);
-            transition: filter 0.6s ease;
+            background-size: cover; background-position: center;
+            z-index: -2; transform: translateZ(0);
+            transition: filter 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* --- 螢火蟲粒子樣式 --- */
+        /* 螢火蟲粒子 */
         .firefly {
-            position: absolute;
-            width: 4px;
-            height: 4px;
-            background: rgba(255, 230, 150, 0.6);
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: -1;
-            filter: blur(1px);
+            position: absolute; width: 4px; height: 4px;
+            background: rgba(255, 230, 150, 0.6); border-radius: 50%;
+            pointer-events: none; z-index: -1; filter: blur(1px);
             box-shadow: 0 0 10px rgba(255, 200, 50, 0.8);
             animation: fireflyMove var(--d) ease-in-out infinite;
         }
@@ -45,56 +35,53 @@
             100% { transform: translateY(-10vh) translateX(-30px); opacity: 0; }
         }
 
-        body.is-dragging #bg-fixed {
-            filter: blur(8px) brightness(0.6);
-        }
-        
-        body.is-dragging .wish:not(.dragging) {
-            opacity: 0.2 !important;
-            filter: blur(4px);
-        }
+        /* 抓取時的景深模糊效果 */
+        body.is-dragging #bg-fixed { filter: blur(8px) brightness(0.6); }
+        body.is-dragging .wish:not(.dragging) { opacity: 0.15 !important; filter: blur(5px); }
 
         body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background-color: #000;
-            color: #2c1a1a; 
+            margin: 0; padding: 0; overflow: hidden;
+            background-color: #000; color: #2c1a1a; 
             font-family: 'JinXuan', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
-            height: 100vh;
-            touch-action: none;
+            height: 100vh; touch-action: none; 
+            user-select: none; -webkit-user-select: none;
+        }
+
+        /* 全螢幕按鈕 */
+        #fullscreen-btn {
+            position: fixed; bottom: 20px; right: 20px;
+            width: 44px; height: 44px; background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(5px); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; z-index: 2000; transition: all 0.3s;
+            border: 1px solid rgba(255, 255, 255, 0.3); opacity: 0.5;
+        }
+        #fullscreen-btn:hover { opacity: 1; background: rgba(255, 255, 255, 0.4); }
+        #fullscreen-btn svg { fill: white; width: 24px; height: 24px; }
+
+        /* 籤紙基礎樣式 */
+        .wish {
+            position: absolute; writing-mode: vertical-rl; text-orientation: upright;
+            background-size: contain; background-repeat: no-repeat; background-position: center top;
+            padding: 30px 15px; box-sizing: border-box; display: flex;
+            align-items: center; justify-content: center;
+            font-size: var(--size); line-height: 1.3; letter-spacing: 1px;
+            animation: floatUp var(--duration) ease-in-out infinite; 
+            opacity: 0; text-align: center; word-break: break-all; cursor: grab;
+            transition: transform 0.2s ease-out, opacity 0.3s, filter 0.3s;
+            
+            /* --- 防止儲存選單與選取 --- */
+            -webkit-touch-callout: none;
+            -webkit-user-drag: none;
             user-select: none;
         }
 
-        .wish {
-            position: absolute;
-            writing-mode: vertical-rl;
-            text-orientation: upright;
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center top;
-            padding: 30px 15px;
-            box-sizing: border-box;
-            display: flex;
-            align-items: center; 
-            justify-content: center;
-            font-size: var(--size);
-            line-height: 1.3;
-            letter-spacing: 1px;
-            animation: floatUp var(--duration) ease-in-out infinite; 
-            opacity: 0;
-            text-align: center;
-            word-break: break-all;
-            cursor: grab;
-            transition: transform 0.2s ease-out, opacity 0.3s, filter 0.3s;
-        }
-
+        /* 抓取中狀態：放大並加深陰影 */
         .wish.dragging {
-            animation-play-state: paused; 
-            cursor: grabbing;
+            animation-play-state: paused; cursor: grabbing;
             transform: translate(var(--tx), var(--ty)) scale(1.25) !important;
-            z-index: 1000;
-            filter: drop-shadow(0 20px 40px rgba(0,0,0,0.6)) brightness(1.1);
+            z-index: 1000; filter: drop-shadow(0 20px 40px rgba(0,0,0,0.6)) brightness(1.1);
+            -webkit-touch-callout: none;
         }
 
         .wish.returning {
@@ -106,60 +93,76 @@
         .ticket-yel { background-image: url('07-YEL.png'); }
         .ticket-whi { background-image: url('07-WHI.png'); }
 
+        /* 搖擺上升動畫與動態陰影 */
         @keyframes floatUp {
-            0% { transform: translateY(110vh) translateX(0) rotate(2deg); opacity: 0; }
+            0% { 
+                transform: translateY(110vh) translateX(0) rotate(2deg); 
+                opacity: 0;
+                filter: drop-shadow(0 5px 5px rgba(0,0,0,0.3));
+            }
             15% { opacity: 1; }
-            30% { transform: translateY(70vh) translateX(20px) rotate(-1deg); }
-            60% { transform: translateY(35vh) translateX(-20px) rotate(1deg); }
+            35% { transform: translateY(65vh) translateX(25px) rotate(-1.5deg); }
+            65% { transform: translateY(30vh) translateX(-25px) rotate(1.5deg); }
             85% { opacity: 1; }
-            100% { transform: translateY(-95vh) translateX(var(--drift)) rotate(-2deg); opacity: 0; }
+            100% { 
+                transform: translateY(-95vh) translateX(var(--drift)) rotate(-2deg); 
+                opacity: 0;
+                filter: drop-shadow(0 30px 20px rgba(0,0,0,0.1));
+            }
         }
     </style>
 </head>
-<body>
-    <div id="bg-fixed"></div>
+<body oncontextmenu="return false;"> <div id="bg-fixed"></div>
     <div id="wish-container"></div>
 
+    <div id="fullscreen-btn" onclick="toggleFullscreen()">
+        <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+    </div>
+
     <script>
-        // --- 初始化音效 (使用 Web Audio 合成一個簡單的摩擦聲，不需額外檔案) ---
+        // --- 1. 全螢幕邏輯 ---
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => console.log(err));
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
+        // --- 2. 物理音效生成 (不需檔案) ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function playGrabSound() {
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const bufferSize = audioCtx.sampleRate * 0.1;
             const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
             const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1;
-            }
+            for (let i = 0; i < bufferSize; i++) { data[i] = Math.random() * 2 - 1; }
             const noise = audioCtx.createBufferSource();
             noise.buffer = buffer;
             const filter = audioCtx.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.value = 800;
+            filter.type = 'lowpass'; filter.frequency.value = 800;
             const gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.04, audioCtx.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-            noise.connect(filter);
-            filter.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
+            noise.connect(filter); filter.connect(gainNode); gainNode.connect(audioCtx.destination);
             noise.start();
         }
 
-        // --- 建立螢火蟲粒子 ---
+        // --- 3. 螢火蟲生成 ---
         function createFireflies() {
-            const container = document.body;
-            for(let i=0; i<20; i++) {
+            for(let i=0; i<25; i++) {
                 const f = document.createElement('div');
                 f.className = 'firefly';
                 f.style.left = Math.random() * 100 + 'vw';
-                f.style.setProperty('--d', (Math.random() * 10 + 10) + 's');
-                f.style.setProperty('--x', (Math.random() * 100 - 50) + 'px');
+                f.style.setProperty('--d', (Math.random() * 8 + 10) + 's');
+                f.style.setProperty('--x', (Math.random() * 120 - 60) + 'px');
                 f.style.animationDelay = Math.random() * 10 + 's';
-                container.appendChild(f);
+                document.body.appendChild(f);
             }
         }
         createFireflies();
 
+        // --- 4. 資料抓取 ---
         const SPREADSHEET_ID = '1H-IhwTpeNzHZbdaXvh-MrIN60JLgtVHwF0XzkkCRe2k';
         const SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
         let knownWishes = new Set();
@@ -168,7 +171,6 @@
         async function fetchWishes() {
             try {
                 const response = await fetch(`${SHEET_CSV_URL}&t=${new Date().getTime()}`);
-                if (!response.ok) return;
                 const csvData = await response.text();
                 const rows = csvData.split('\n').map(row => 
                     row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => cell.replace(/^"(.*)"$/, '$1').trim())
@@ -186,6 +188,7 @@
             } catch (e) { console.error(e); }
         }
 
+        // --- 5. 建立與拖拉互動 ---
         function createWish(text) {
             const container = document.getElementById('wish-container');
             const el = document.createElement('div');
@@ -193,14 +196,13 @@
             el.innerText = text;
 
             const left = Math.random() * 80 + 10;
-            const duration = Math.random() * 5 + 12; 
-            const drift = (Math.random() - 0.5) * 250;
+            const duration = Math.random() * 4 + 10; // 加快速度 (10-14s)
+            const drift = (Math.random() - 0.5) * 260;
             
-            let baseWidth = 110;
-            let fontSize = 16; 
+            let baseWidth = 110; let fontSize = 16; 
             if (text.length > 8) { baseWidth = 140; fontSize = 14; }
             if (text.length > 15) { fontSize = 12; }
-            const baseHeight = baseWidth * (900 / 600);
+            const baseHeight = baseWidth * (900 / 600); // 維持 600x900 比例
 
             el.style.width = `${baseWidth}px`;
             el.style.height = `${baseHeight}px`;
@@ -213,14 +215,15 @@
             let startX, startY, currentX = 0, currentY = 0;
 
             const startDrag = (e) => {
-                playGrabSound(); // 播放抓取聲
+                playGrabSound();
                 const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
                 const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
-                startX = clientX - currentX;
-                startY = clientY - currentY;
+                startX = clientX - currentX; startY = clientY - currentY;
+                
                 el.classList.add('dragging');
                 document.body.classList.add('is-dragging');
                 el.classList.remove('returning');
+                
                 document.addEventListener('mousemove', drag);
                 document.addEventListener('touchmove', drag, { passive: false });
                 document.addEventListener('mouseup', stopDrag);
@@ -232,8 +235,8 @@
                 e.preventDefault();
                 const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
                 const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
-                currentX = clientX - startX;
-                currentY = clientY - startY;
+                currentX = clientX - startX; currentY = clientY - startY;
+                
                 el.style.setProperty('--tx', `${currentX}px`);
                 el.style.setProperty('--ty', `${currentY}px`);
                 el.style.transform = `translate(${currentX}px, ${currentY}px) scale(1.25)`;
